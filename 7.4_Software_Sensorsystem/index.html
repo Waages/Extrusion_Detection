@@ -1,0 +1,467 @@
+<!DOCTYPE html>
+<html>
+<head>
+	<title>Raspberry Pi Kamera</title>
+	<style>
+		body {
+			margin: 0;
+			padding: 20px;
+			background-color: #333;
+			color: white;
+			font-family: Arial, sans-serif;
+			text-align: center;
+		}
+	
+		#videoStream {
+			height: 80vh;
+			max-width: 95vw;
+			border: 2px solid #555;
+			border-radius: 10px;
+		}
+		
+		.variable-display {
+			background-color: #444;
+			padding: 20px;
+			border-radius: 10px;
+			margin: 20px auto;
+		}
+		
+		.variable-value {
+			font-size: 36px;
+			font-weight: bold;
+			color: #4CAF50;
+			margin: 10px 0;
+		}
+		
+		.button-container {
+			margin: 20px auto;
+			max-width: 300px;
+		}
+		
+		.footer-text {
+			font-size: 1em;
+			text-align: right;
+			color: #aaaaaa;
+			margin-top: 10px;
+		}
+
+		.control-button {
+			background-color: #4CAF50;
+			border: none;
+			color: white;
+			padding: 15px 32px;
+			text-align: center;
+			text-decoration: none;
+			display: inline-block;
+			font-size: 32px;
+			margin: 4px 2px;
+			cursor: pointer;
+			border-radius: 8px;
+			transition: background-color 0.3s, transform 0.1s;
+			width: 250px;
+			min-height: 150px;
+		}
+
+		.control-button:hover {
+		background-color: #5e9b61;
+		}
+
+		.laser-on {
+			background-color: #ff6b35 !important;
+		}
+		
+		.laser-on:hover {
+			background-color: #e55a2b !important;
+		}
+
+		.record-on {
+			background-color: #ff0000 !important;
+		}
+		
+		.record-on:hover {
+			background-color: #cc0000 !important;
+		}
+
+		.fps-on {
+			background-color: #ffee00 !important;
+		}
+		
+		.fps-on:hover {
+			background-color: #ccc128 !important;
+		}
+
+		.control-button:active {
+			background-color: #999999 !important;
+			transform: translateY(2px);
+		}
+		
+		.button-status {
+			margin-top: 10px;
+			font-size: 14px;
+			color: #ccc;
+		}
+		
+		.total-grid {
+			display: grid;
+			grid-template-columns: auto 1fr;
+			gap: 15px;
+			margin-top: 15px;
+		}
+
+		.total-item {
+			background-color: #555;
+			padding: 10px;
+			border-radius: 5px;
+			display: flex;
+			flex-direction: column;
+			justify-content: space-between;
+			height: 100%;
+		}
+
+		.variable-grid {
+			display: grid;
+			grid-template-columns: 1fr 1fr;
+			gap: 15px;
+			margin-top: 15px;
+		}
+		
+		.variable-item {
+			background-color: #555;
+			padding: 10px;
+			border-radius: 5px;
+		}
+		
+		.variable-name {
+			font-size: 24px;
+			color: #ccc;
+			margin-bottom: 5px;
+		}
+		
+	</style>
+</head>
+<body>
+	<h1>Extrusion Detection</h1>
+
+	<div class="total-grid">
+		<div class="total-item">
+			<img id="videoStream" src="/video_feed">
+		</div>
+
+		<div class="total-item">
+			<div class="button-container">
+				<h3>Steuerung</h3>
+				<button id="laserButton" class="control-button" onclick="laserButton()">
+					Laser
+				</button>
+				<button id="recordButton" class="control-button" onclick="recordButton()">
+					Record
+				</button>
+				<button id="fpsButton" class="control-button" onclick="fpsButton()">
+					Auflösung
+				</button>
+				<div id="buttonStatus" class="button-status">
+					Bereit
+				</div>
+			</div>
+		
+			<div class="variable-display">
+				<h3>Live Variablen:</h3>
+				<div class="variable-grid">
+					<div class="variable-item" id="breitefeld" onclick="Breite_Winkel()">
+						<div class="variable-name" id="breite-label">Breite</div>
+						<div id="breite" class="variable-value">-</div>
+					</div>
+					<div class="variable-item" id="hoehefeld" onclick="Hoehe_Save()">
+						<div class="variable-name">Höhe (Baseline)</div>
+						<div id="hoehe" class="variable-value">-</div>
+					</div>
+					<div class="variable-item">
+						<div class="variable-name">Framerate</div>
+						<div id="framerate" class="variable-value">-</div>
+					</div>
+					<div class="variable-item">
+						<div class="variable-name">CPU-Temperatur</div>
+						<div id="temperatur" class="variable-value">-</div>
+					</div>
+					<div class="variable-item">
+						<div class="variable-name">Zähler</div>
+						<div id="zaehler" class="variable-value">-</div>
+					</div>
+					<div class="variable-item">
+						<div class="variable-name">Debug</div>
+						<div id="text" class="variable-value">-</div>
+					</div>
+				</div>
+			</div>
+
+			<div class="footer-text">
+				Aaron Schmidt<br>Masterthesis - 2025<br>DLR Stuttgart
+			</div>
+		</div>
+	</div> 
+	
+	<script>
+		function updateVariables() {
+			const laserbutton = document.getElementById('laserButton');
+			const recordbutton = document.getElementById('recordButton');
+			const fpsButton= document.getElementById('fpsButton');
+			const video = document.getElementById('videoStream');
+			const breitelabel = document.getElementById("breite-label");
+			const breitefeld = document.getElementById("breite");
+			fetch('/api/variables')
+				.then(response => response.json())
+				.then(data => {
+						document.getElementById('framerate').textContent = data.framerate;
+						document.getElementById('temperatur').textContent = data.temperatur + ' °C';
+						document.getElementById('text').textContent = data.text;
+						document.getElementById('zaehler').textContent = data.zaehler;
+						document.getElementById('hoehe').textContent = data.detect_baseheight;
+						
+						if(data.laser_status === true) {
+							laserbutton.textContent = "Laser AN" ;
+							laserbutton.classList.add('laser-on');
+						} else if (data.laser_status === false) {
+							laserbutton.textContent = "Laser AUS";
+							laserbutton.classList.remove('laser-on');
+						} else {
+							laserbutton.textContent = "Laser unknown" ;
+							laserbutton.classList.remove('laser-on');
+						}
+
+						if(data.record_status === true) {
+							recordbutton.textContent = "Recording" ;
+							recordbutton.classList.add('record-on');
+						} else if (data.record_status === false) {
+							recordbutton.textContent = "Record AUS";
+							recordbutton.classList.remove('record-on');
+						} else {
+							recordbutton.textContent = "Laser unknown";
+							recordbutton.classList.remove('record-on');
+						}
+
+						if(data.fps_status === true) {
+							fpsButton.textContent = "High FPS" ;
+							fpsButton.classList.add('fps-on');
+						} else if (data.fps_status === false) {
+							fpsButton.textContent = "High Quality";
+							fpsButton.classList.remove('fps-on');
+						} else {
+							fpsButton.textContent = "Quality unknown";
+							fpsButton.classList.remove('fps-on');
+						}
+						if(breitelabel.textContent === "Breite") {
+							breitefeld.textContent = data.detect_width;
+						} 
+						else if(breitelabel.textContent === "Winkel") {
+							breitefeld.textContent = data.detect_angle + "°";
+						}
+						else {
+							breitefeld.textContent = "---";
+						}
+
+						if(data.text === "testserver"){
+							video.style.borderColor = "#ff0000"
+						}
+						
+				})
+				.catch(error => {
+					console.error('Fehler: ', error);
+					document.getElementById('framerate').textContent = '---';
+					document.getElementById('temperatur').textContent = '---';
+					document.getElementById('text').textContent = '---';
+					document.getElementById('zaehler').textContent = '---';
+					document.getElementById('hoehe').textContent = '---';
+					document.getElementById('breite').textContent = '---';
+				});
+			
+		}
+			
+		function laserButton() {
+			const button = document.getElementById('laserButton');
+			const status = document.getElementById('buttonStatus');
+			button.disabled = true;
+			button.textContent = "Laser ...";
+			
+			fetch('/api/button', {
+				method: 'POST',
+				headers: {
+					'Content-Type': 'application/json',
+				},
+				body: JSON.stringify({
+					'action': 'press'
+				})
+			})
+			.then(response => response.json())
+			.then(data => {
+				if (data.status === 'success') {
+					if(data.laser_status === true) {
+						button.textContent = "Laser AN" ;
+						button.classList.add('laser-on');
+					} else if (data.laser_status === false) {
+						button.textContent = "Laser AUS" ;
+						button.classList.remove('laser-on');
+					} else {
+						button.textContent = "Laser unknown" ;
+						button.classList.remove('laser-on');
+					}
+					status.textContent = 'Erfolgreich gedrückt';
+					
+				} else {
+					status.textContent = 'Fehler: ' + data.message;
+				}
+				button.disabled = false;
+			})
+			.catch(error => {
+				console.error('Fehler beim Button-Press:', error);
+				status.textContent = 'Verbindungsfehler!';
+				button.textContent = "Server antwortet nicht";
+				button.disabled = false;
+			});
+		}
+
+		function recordButton() {
+			const button = document.getElementById('recordButton');
+			const status = document.getElementById('buttonStatus');
+			button.disabled = true;
+			button.textContent = "Record ...";
+			
+			fetch('/api/button', {
+				method: 'POST',
+				headers: {
+					'Content-Type': 'application/json',
+				},
+				body: JSON.stringify({
+					'action': 'record'
+				})
+			})
+			.then(response => response.json())
+			.then(data => {
+				if (data.status === 'success') {
+					if(data.record_status === true) {
+						button.textContent = "Record AN";
+						button.classList.add('record-on');
+					} else if (data.record_status === false) {
+						button.textContent = "Record AUS";
+						button.classList.remove('record-on');
+					} else {
+						button.textContent = "Record unknown";
+						button.classList.remove('record-on');
+					}
+					status.textContent = 'Erfolgreich gedrückt';
+					
+				} else {
+					status.textContent = 'Fehler: ' + data.message;
+				}
+				button.disabled = false;
+			})
+			.catch(error => {
+				console.error('Fehler beim Button-Press:', error);
+				status.textContent = 'Verbindungsfehler!';
+				button.textContent = "Server antwortet nicht";
+				button.disabled = false;
+			});
+		}
+		
+		function Hoehe_Save() {
+			const button = document.getElementById('hoehefeld');
+			const status = document.getElementById('buttonStatus');
+			const valuefield = document.getElementById('hoehe');
+			button.disabled = true;
+			valuefield.textContent = "Save";
+			
+			fetch('/api/button', {
+				method: 'POST',
+				headers: {
+					'Content-Type': 'application/json',
+				},
+				body: JSON.stringify({
+					'action': 'hoehe'
+				})
+			})
+			.then(response => response.json())
+			.then(data => {
+				if (data.status === 'success') {
+					button.style.color = "#4CAF50";
+					status.textContent = 'Erfolgreich gedrückt';
+					
+				} else {
+					button.style.color = "#ff0000";
+					status.textContent = 'Fehler: ' + data.message;
+				}
+				button.disabled = false;
+			})
+			.catch(error => {
+				console.error('Fehler beim Button-Press:', error);
+				status.textContent = 'Verbindungsfehler!';
+				button.textContent = "Server antwortet nicht";
+				button.disabled = false;
+			});
+		}
+
+		function fpsButton() {
+			const button = document.getElementById('fpsButton');
+			const status = document.getElementById('buttonStatus');
+			button.disabled = true;
+			button.textContent = "Quality ...";
+			
+			fetch('/api/button', {
+				method: 'POST',
+				headers: {
+					'Content-Type': 'application/json',
+				},
+				body: JSON.stringify({
+					'action': 'fps'
+				})
+			})
+			.then(response => response.json())
+			.then(data => {
+				if (data.status === 'success') {
+					if(data.fps_status === true) {
+						button.textContent = "High FPS" ;
+						button.classList.add('fps-on');
+					} else if (data.fps_status === false) {
+						button.textContent = "High Quality" ;
+						button.classList.remove('fps-on');
+					} else {
+						button.textContent = "Quality unknown" ;
+						button.classList.remove('fps-on');
+					}
+					status.textContent = 'Erfolgreich gedrückt';
+					
+				} else {
+					status.textContent = 'Fehler: ' + data.message;
+				}
+				button.disabled = false;
+			})
+			.catch(error => {
+				console.error('Fehler beim Button-Press:', error);
+				status.textContent = 'Verbindungsfehler!';
+				button.textContent = "Server antwortet nicht";
+				button.disabled = false;
+			});
+		}
+
+		function Breite_Winkel() {
+			const label = document.getElementById("breite-label");
+			const valueField = document.getElementById("breite");
+			if (label.textContent === "Breite") {
+				label.textContent = "Winkel";
+				valueField.textContent = data.detect_angle + "°";
+			} 
+			else if (label.textContent === "Winkel") {
+				label.textContent = "Breite";
+				valueField.textContent = data.detect_width;
+			}
+			else {
+				label.textContent = "Breite";
+				valueField.textContent = "---";
+			}
+		}
+
+
+		updateVariables();
+		setInterval(updateVariables, 250);
+	</script>
+
+</body>
+</html>
