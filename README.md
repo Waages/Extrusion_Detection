@@ -3,7 +3,7 @@ System zur automatischen Austragungsmessung beim robotischen Screw Extrusion Add
 
 Masterthesis
 
-Hochschule Reultingen
+Hochschule Reutlingen
 
 Studiengang Mechatronik
 

@@ -220,9 +220,9 @@ def generate_frames():
 def calculate_height(height_raw,zeropos):
 	global fps_status
 	if fps_status:
-		faktor = -0,0032
+		faktor = -0.0032
 	else:
-		faktor = -0,0064
+		faktor = -0.0064
 	# y = -0,0064x + 14,048
 	# Wenn gleich, dann relative Distanz 0
 	if (height_raw == zeropos):
